@@ -126,7 +126,16 @@
     background:#fff;outline:none;transition:border .15s,box-shadow .15s;
   }
   .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,109,240,.15)}
+  .field textarea{
+    width:100%;font-family:var(--font);font-size:12px;color:var(--ink);
+    padding:10px 12px;border:1px solid rgba(60,60,90,.2);border-radius:11px;
+    background:#fff;outline:none;resize:vertical;line-height:1.45;
+  }
+  .field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,109,240,.15)}
   .field .hint{font-size:10.5px;color:#9a9aa6;margin-top:4px}
+  .io-row{display:flex;gap:8px;justify-content:center;margin-top:10px}
+  .io-btn{font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink);background:rgba(120,120,140,.12);border:none;border-radius:999px;padding:6px 13px;cursor:pointer;transition:background .15s}
+  .io-btn:hover{background:rgba(120,120,140,.24)}
   .row{display:flex;gap:8px;margin-top:16px}
   .btn{flex:1;font-family:var(--font);font-size:14px;font-weight:700;padding:11px;border-radius:12px;border:none;cursor:pointer;transition:.15s}
   .btn.primary{background:var(--ink);color:#fff}
@@ -148,7 +157,13 @@
       <button class="editbtn" id="editBtn">편집</button>
     </div>
     <div class="grid" id="grid"></div>
-    <div class="hint-bar" id="hintBar">탭하면 편집 · 끌면 이동 · − 삭제</div>
+    <div class="hint-bar" id="hintBar">
+      <div>탭하면 편집 · 끌면 이동 · − 삭제</div>
+      <div class="io-row">
+        <button class="io-btn" id="exportBtn">내보내기</button>
+        <button class="io-btn" id="importBtn">가져오기</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -172,6 +187,21 @@
     <div class="row">
       <button class="btn ghost" id="cancelBtn">취소</button>
       <button class="btn primary" id="saveBtn">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- backup / restore modal -->
+<div class="overlay" id="ioOverlay">
+  <div class="modal">
+    <h3 id="ioTitle">백업</h3>
+    <div class="field">
+      <label id="ioLabel">코드</label>
+      <textarea id="ioText" rows="6"></textarea>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="ioCancel">닫기</button>
+      <button class="btn primary" id="ioAction">복사</button>
     </div>
   </div>
 </div>
@@ -368,6 +398,58 @@ saveBtn.onclick=()=>{
   save();closeModal();render();
 };
 [inUrl,inEmoji,inName].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')saveBtn.click();}));
+
+/* ---------- backup / restore ---------- */
+const ioOverlay=document.getElementById('ioOverlay');
+const ioTitle=document.getElementById('ioTitle');
+const ioLabel=document.getElementById('ioLabel');
+const ioText=document.getElementById('ioText');
+const ioAction=document.getElementById('ioAction');
+let ioMode='export';
+document.getElementById('exportBtn').onclick=()=>{
+  ioMode='export';
+  ioTitle.textContent='내보내기 (백업)';
+  ioLabel.textContent='아래 코드를 전체 복사해 두세요. 다른 브라우저의 "가져오기"에 붙여넣으면 그대로 복원됩니다.';
+  ioLabel.style.color='';
+  ioText.value=JSON.stringify(links);
+  ioText.readOnly=true;
+  ioAction.textContent='클립보드 복사';
+  ioOverlay.classList.add('show');
+  setTimeout(()=>{ioText.focus();ioText.select();},80);
+};
+document.getElementById('importBtn').onclick=()=>{
+  ioMode='import';
+  ioTitle.textContent='가져오기 (복원)';
+  ioLabel.textContent='백업한 코드를 붙여넣고 불러오기를 누르세요. (현재 목록을 덮어씁니다)';
+  ioLabel.style.color='';
+  ioText.value='';
+  ioText.readOnly=false;
+  ioAction.textContent='불러오기';
+  ioOverlay.classList.add('show');
+  setTimeout(()=>ioText.focus(),80);
+};
+document.getElementById('ioCancel').onclick=()=>ioOverlay.classList.remove('show');
+ioOverlay.onclick=(e)=>{if(e.target===ioOverlay)ioOverlay.classList.remove('show');};
+ioAction.onclick=async ()=>{
+  if(ioMode==='export'){
+    let ok=false;
+    try{await navigator.clipboard.writeText(ioText.value);ok=true;}catch(_){}
+    if(!ok){try{ioText.select();document.execCommand('copy');ok=true;}catch(_){}}
+    ioAction.textContent=ok?'복사됨 ✓':'직접 복사하세요';
+    setTimeout(()=>{ioAction.textContent='클립보드 복사';},1600);
+  }else{
+    try{
+      const arr=JSON.parse(ioText.value.trim());
+      if(!Array.isArray(arr)) throw 0;
+      links=arr.filter(x=>x&&x.url).map(x=>({name:String(x.name||''),url:String(x.url),emoji:x.emoji?String(x.emoji):undefined}));
+      save();render();
+      ioOverlay.classList.remove('show');
+    }catch(_){
+      ioLabel.textContent='⚠️ 코드 형식이 올바르지 않습니다. 전체를 다시 붙여넣어 주세요.';
+      ioLabel.style.color='var(--danger)';
+    }
+  }
+};
 
 /* ---------- clock ---------- */
 const DAY=['일','월','화','수','목','금','토'];
