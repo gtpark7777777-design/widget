@@ -44,6 +44,7 @@
     animation:pop .45s ease forwards;
   }
   @keyframes pop{to{opacity:1;transform:translateY(0)}}
+  .hint-bar{display:none;margin-top:14px;text-align:center;font-size:11.5px;color:var(--ink-soft);letter-spacing:.02em}
 
   .top{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 14px}
   .top .when{line-height:1.05}
@@ -94,6 +95,12 @@
   .grid.editing .tile:not(.add) .badge-wrap{animation:wiggle .32s infinite}
   .grid.editing .tile:not(.add):nth-child(even) .badge-wrap{animation-delay:-.16s}
   @keyframes wiggle{0%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}100%{transform:rotate(-1.6deg)}}
+  /* drag to reorder (edit mode) */
+  .grid.editing .tile:not(.add){touch-action:none;cursor:grab}
+  .tile.drag-active{z-index:6;opacity:.95;transform:scale(1.14);transition:transform .12s}
+  .tile.drag-active .badge-wrap{animation:none!important}
+  .tile.drag-active .icon{box-shadow:0 10px 20px -6px rgba(20,18,40,.45)}
+  .grid.editing .tile:not(.add):not(.drag-active){transition:transform .18s ease}
 
   /* modal */
   .overlay{
@@ -141,13 +148,14 @@
       <button class="editbtn" id="editBtn">편집</button>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="hint-bar" id="hintBar">탭하면 편집 · 끌면 이동 · − 삭제</div>
   </div>
 </div>
 
 <!-- add modal -->
 <div class="overlay" id="overlay">
   <div class="modal">
-    <h3>바로가기 추가</h3>
+    <h3 id="modalTitle">바로가기 추가</h3>
     <div class="field">
       <label>이름</label>
       <input id="inName" placeholder="예) 본사포털" maxlength="14" autocomplete="off">
@@ -159,7 +167,7 @@
     </div>
     <div class="field">
       <label>아이콘 이모지 (선택)</label>
-      <input id="inEmoji" placeholder="비워두면 사이트 로고 자동" maxlength="4" autocomplete="off">
+      <input id="inEmoji" placeholder="비워두면 이름 앞글자로 표시" maxlength="4" autocomplete="off">
     </div>
     <div class="row">
       <button class="btn ghost" id="cancelBtn">취소</button>
@@ -200,6 +208,9 @@ function normalizeUrl(u){
   if(!/^https?:\/\//i.test(u)) u='https://'+u;
   return u;
 }
+/* 이름 앞글자 + 이름 기반 고정 색상 (순서 바뀌어도 색 유지) */
+function firstChar(s){const a=Array.from((s||'?').trim());return (a[0]||'?').toUpperCase();}
+function colorFor(s){s=s||'';let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return PALETTE[h%PALETTE.length];}
 /* 주소를 보고 어울리는 아이콘(이모지) 자동 지정 */
 function resolveEmoji(u){
   u=(u||'').toLowerCase();
@@ -231,24 +242,17 @@ function render(){
 function makeTile(lk,i){
   const t=document.createElement('button');
   t.className='tile';
+  t.dataset.idx=i;
   const bw=document.createElement('div');bw.className='badge-wrap';
 
   const ic=document.createElement('div');ic.className='icon';
-  const emoji=lk.emoji||resolveEmoji(lk.url);
-  if(emoji){
-    const e=document.createElement('span');e.className='emoji';e.textContent=emoji;ic.appendChild(e);
+  if(lk.emoji){
+    const e=document.createElement('span');e.className='emoji';e.textContent=lk.emoji;ic.appendChild(e);
   }else{
-    const img=document.createElement('img');
-    img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(hostOf(lk.url))+'&sz=64';
-    img.alt='';
-    img.onerror=()=>{
-      ic.innerHTML='';
-      const L=document.createElement('span');L.className='letter';
-      L.textContent=(lk.name||'?').trim().charAt(0).toUpperCase();
-      ic.style.background=PALETTE[i%PALETTE.length];
-      ic.appendChild(L);
-    };
-    ic.appendChild(img);
+    const L=document.createElement('span');L.className='letter';
+    L.textContent=firstChar(lk.name||lk.url);
+    ic.style.background=colorFor(lk.name||lk.url);
+    ic.appendChild(L);
   }
   bw.appendChild(ic);
 
@@ -260,6 +264,7 @@ function makeTile(lk,i){
 
   t.appendChild(bw);t.appendChild(lbl);
   t.onclick=()=>{ if(editing) return; window.open(lk.url,'_blank','noopener'); };
+  t.addEventListener('pointerdown',(e)=>startDrag(e,t));
   return t;
 }
 function makeAddTile(){
@@ -275,30 +280,94 @@ function makeAddTile(){
 
 /* ---------- edit toggle ---------- */
 const editBtn=document.getElementById('editBtn');
+const hintBar=document.getElementById('hintBar');
 editBtn.onclick=()=>{
   editing=!editing;
   editBtn.textContent=editing?'완료':'편집';
   editBtn.classList.toggle('on',editing);
+  hintBar.style.display=editing?'block':'none';
   render();
 };
+
+/* ---------- drag to reorder (마우스+터치) ---------- */
+let dCand=null,dId=null,dx0=0,dy0=0,dragging=false,dEl=null;
+function startDrag(e,tile){
+  if(!editing) return;
+  if(e.target.closest('.del')) return;
+  dCand=tile;dId=e.pointerId;dx0=e.clientX;dy0=e.clientY;dragging=false;
+}
+function tileUnder(x,y){
+  const ts=grid.querySelectorAll('.tile:not(.add)');
+  for(const t of ts){
+    if(t===dEl) continue;
+    const r=t.getBoundingClientRect();
+    if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom) return t;
+  }
+  return null;
+}
+document.addEventListener('pointermove',(e)=>{
+  if(!dCand) return;
+  if(!dragging){
+    if(Math.abs(e.clientX-dx0)+Math.abs(e.clientY-dy0)<8) return;
+    dragging=true;dEl=dCand;
+    try{dEl.setPointerCapture(dId);}catch(_){}
+    dEl.classList.add('drag-active');
+  }
+  e.preventDefault();
+  const over=tileUnder(e.clientX,e.clientY);
+  if(over&&over!==dEl){
+    const r=over.getBoundingClientRect();
+    if(e.clientX>r.left+r.width/2) over.after(dEl); else over.before(dEl);
+  }
+},{passive:false});
+document.addEventListener('pointerup',(e)=>{
+  if(!dCand) return;
+  if(dragging){
+    try{dEl.releasePointerCapture(dId);}catch(_){}
+    dEl.classList.remove('drag-active');
+    const order=[...grid.querySelectorAll('.tile:not(.add)')].map(t=>+t.dataset.idx);
+    links=order.map(i=>links[i]);
+    save();render();
+  } else {
+    openEdit(+dCand.dataset.idx);
+  }
+  dCand=null;dragging=false;dEl=null;dId=null;
+});
 
 /* ---------- modal ---------- */
 const overlay=document.getElementById('overlay');
 const inName=document.getElementById('inName');
 const inUrl=document.getElementById('inUrl');
 const inEmoji=document.getElementById('inEmoji');
-function openModal(){inName.value='';inUrl.value='';inEmoji.value='';overlay.classList.add('show');setTimeout(()=>inName.focus(),80);}
-function closeModal(){overlay.classList.remove('show');}
+const modalTitle=document.getElementById('modalTitle');
+const saveBtn=document.getElementById('saveBtn');
+let editIndex=null;
+function openModal(){
+  editIndex=null;
+  inName.value='';inUrl.value='';inEmoji.value='';
+  modalTitle.textContent='바로가기 추가';saveBtn.textContent='추가';
+  overlay.classList.add('show');setTimeout(()=>inName.focus(),80);
+}
+function openEdit(i){
+  const lk=links[i]; if(!lk) return;
+  editIndex=i;
+  inName.value=lk.name||'';inUrl.value=lk.url||'';inEmoji.value=lk.emoji||'';
+  modalTitle.textContent='바로가기 편집';saveBtn.textContent='저장';
+  overlay.classList.add('show');setTimeout(()=>inName.focus(),80);
+}
+function closeModal(){overlay.classList.remove('show');editIndex=null;}
 document.getElementById('cancelBtn').onclick=closeModal;
 overlay.onclick=(e)=>{if(e.target===overlay)closeModal();};
-document.getElementById('saveBtn').onclick=()=>{
+saveBtn.onclick=()=>{
   const name=inName.value.trim();
   const url=normalizeUrl(inUrl.value);
   if(!url){inUrl.focus();return;}
-  links.push({name:name||hostOf(url),url:url,emoji:inEmoji.value.trim()||undefined});
+  const item={name:name||hostOf(url),url:url,emoji:inEmoji.value.trim()||undefined};
+  if(editIndex!==null && links[editIndex]) links[editIndex]=item;
+  else links.push(item);
   save();closeModal();render();
 };
-[inUrl,inEmoji,inName].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('saveBtn').click();}));
+[inUrl,inEmoji,inName].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')saveBtn.click();}));
 
 /* ---------- clock ---------- */
 const DAY=['일','월','화','수','목','금','토'];
