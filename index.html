@@ -209,16 +209,20 @@
 <script>
 /* ---------- defaults (지점장님 자주 쓰는 사이트) ---------- */
 const DEFAULT_LINKS = [
+  {name:'KCC메일', url:'https://kcc.daouoffice.com/gw/app/mail'},
+  {name:'CRM', url:'https://www.crm4u.co.kr/kccautomobile'},
+  {name:'계출', url:'https://docs.google.com/spreadsheets/d/1UzlmRSZBmiOHCX0KlbjlZiJJcZro7UgoUG_euwPqLsM/edit?gid=1759732131#gid=1759732131'},
   {name:'CXP', url:'https://cxp.my.site.com/CXP/s/'},
-  {name:'금월이벤트', url:'https://cxp.my.site.com/CXP/s/report/00OKB000000ja7m/%EA%B8%88%EC%9B%94-%EC%83%9D%EC%84%B1-%EC%9D%B4%EB%B2%A4%ED%8A%B8?reportFilters=%5B%7B%22value%22%3A%22Ilsan%22%2C%22operator%22%3A%22contains%22%2C%22column%22%3A%22Opportunity.Retailer_Name__c%22%7D%5D'},
-  {name:'가망시트', url:'https://docs.google.com/spreadsheets/d/1UzlmRSZBmiOHCX0KlbjlZiJJcZro7UgoUG_euwPqLsM/edit?gid=753053941'},
-  {name:'손익SR', url:'https://docs.google.com/spreadsheets/d/1BJqsTC3yT5s3qwx2Pz-wq4liGon0QpJpotKLgg30ctQ/edit'},
+  {name:'NPS', url:'https://connect.jlrsso.com/adfs/ls/'},
+  {name:'지점장', url:'https://docs.google.com/spreadsheets/d/1DfWxR21mPnIMEWmyRzTRexD-Hl1VI-2bFsmolO4mVWE/edit?gid=461001102#gid=461001102'},
+  {name:'KPI', url:'https://gtpark7777777-design.github.io/kcc-kpi/?v=4'},
   {name:'Gmail', url:'https://mail.google.com'},
-  {name:'캘린더', url:'https://calendar.google.com'},
-  {name:'Notion', url:'https://www.notion.so'},
-  {name:'명함', url:'https://kcc-ilsan-cards.pages.dev'},
+  {name:'상담툴', url:'https://kcc-ilsan.kr/tool/'},
+  {name:'로스트리드', url:'https://docs.google.com/spreadsheets/d/1CWjWAW4HZQhD0IJhrsIkJ9t6eQfAbrUBAmshdxUn_0E/edit?gid=1546333716#gid=1546333716'},
+  {name:'재고표', url:'https://docs.google.com/spreadsheets/d/1DDfe6K9WttZkisBP4CqahiQDd1gT1SkTThp4rM8fGc0/edit?gid=1270283038#gid=1270283038'},
+  {name:'리드배정', url:'https://cxp.my.site.com/CXP/s/login/?language=en_US&ec=302&startURL=%2FCXP%2Fs%2Flead%2FLead%2FDefault%3FLead-filterId%3DX001_All_Open_Leads_SG'},
 ];
-const KEY='kcc_ilsan_links_v1';
+const KEY='kcc_ilsan_links_v2';
 const PALETTE=['#2f6df0','#e2725b','#3cb371','#9b59b6','#e0a020','#16a8a6','#d4566a','#5566c0'];
 
 let links=load();
